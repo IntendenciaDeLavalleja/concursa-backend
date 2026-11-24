@@ -1,0 +1,13 @@
+**
+!requirements.txt
+!entrypoint.sh
+!wsgi.py
+!app/
+!app/**
+!migrations/
+!migrations/**
+!public/
+!public/**
+**/__pycache__
+**/*.py[cod]
+**/.env*

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; color: #213547; background: #f4f7fb; }
+        .container { max-width: 620px; margin: 0 auto; background: #ffffff; border: 1px solid #dbe7f3; border-radius: 14px; overflow: hidden; }
+        .header { background: linear-gradient(135deg, #0d6efd, #0b87d8); color: #ffffff; padding: 22px; text-align: center; }
+        .content { padding: 28px; line-height: 1.7; }
+        .footer { font-size: 12px; color: #64748b; text-align: center; padding: 18px 24px; border-top: 1px solid #e2e8f0; }
+        .tracking-code { font-family: "Courier New", Courier, monospace; font-size: 24px; font-weight: bold; color: #0f4c81; background: #eff6ff; padding: 10px 16px; border-radius: 8px; display: inline-block; letter-spacing: 0.12em; }
+        .box { background: #f8fbff; border: 1px solid #dbeafe; border-radius: 10px; padding: 16px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Inscripción confirmada</h2>
+            <p>Lavalleja Concursa</p>
+        </div>
+        <div class="content">
+            <p>Hola <strong>{{ postulacion.nombre_completo }}</strong>,</p>
+            <p>Tu correo fue verificado y la inscripción al concurso quedó confirmada con éxito.</p>
+
+            <div class="box">
+                <p><strong>Concurso:</strong> {{ postulacion.concurso.titulo }}</p>
+                <p><strong>Documento:</strong> {{ postulacion.documento }}</p>
+            </div>
+
+            <p>Tu código de seguimiento es:</p>
+            <p style="text-align: center;">
+                <span class="tracking-code">{{ postulacion.tracking_code }}</span>
+            </p>
+
+            <p>Con este código podrás consultar el estado de tu postulación en el portal.</p>
+        </div>
+        <div class="footer">
+            <p>Este es un mensaje automático. No respondas a este correo.</p>
+        </div>
+    </div>
+</body>
+</html>

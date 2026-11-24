@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; color: #213547; background: #f4f7fb; }
+        .container { max-width: 620px; margin: 0 auto; background: #ffffff; border: 1px solid #dbe7f3; border-radius: 14px; overflow: hidden; }
+        .header { background: linear-gradient(135deg, #0d6efd, #0b87d8); color: #ffffff; padding: 22px; text-align: center; }
+        .content { padding: 28px; line-height: 1.7; }
+        .footer { font-size: 12px; color: #64748b; text-align: center; padding: 18px 24px; border-top: 1px solid #e2e8f0; }
+        .box { background: #f8fbff; border: 1px solid #dbeafe; border-radius: 10px; padding: 16px; margin: 20px 0; }
+        .muted { color: #64748b; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Confirmá tu preinscripción</h2>
+            <p>Lavalleja Concursa</p>
+        </div>
+        <div class="content">
+            <p>Hola <strong>{{ postulacion.nombre_completo }}</strong>,</p>
+            <p>Recibimos tu preinscripción al concurso y necesitamos confirmar que esta casilla de correo te pertenece para finalizarla.</p>
+
+            <div class="box">
+                <p><strong>Concurso:</strong> {{ postulacion.concurso.titulo }}</p>
+                <p><strong>Documento:</strong> {{ postulacion.documento }}</p>
+                <p><strong>Correo:</strong> {{ postulacion.email }}</p>
+            </div>
+
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 28px auto;">
+                <tr>
+                    <td align="center" bgcolor="#0d6efd" style="border-radius: 10px; background-color: #0d6efd;">
+                        <a
+                            href="{{ verification_url }}"
+                            style="display: inline-block; padding: 14px 22px; font-family: Arial, sans-serif; font-size: 16px; font-weight: 700; line-height: 1; color: #ffffff; text-decoration: none; background-color: #0d6efd; border-radius: 10px; border: 1px solid #0d6efd;"
+                        >Confirmar inscripción</a>
+                    </td>
+                </tr>
+            </table>
+
+            <p class="muted">Si el botón no funciona, copiá y pegá este enlace en tu navegador:</p>
+            <p class="muted">{{ verification_url }}</p>
+            <p class="muted">Este enlace vence en 24 horas.</p>
+        </div>
+        <div class="footer">
+            <p>Este es un mensaje automático. No respondas a este correo.</p>
+        </div>
+    </div>
+</body>
+</html>

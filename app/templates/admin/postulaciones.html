@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}Postulaciones{% endblock %}
+{% block content %}
+
+<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl font-extrabold text-white tracking-tight">Postulaciones</h1>
+        <p class="text-sm text-blue-400/75 mt-1">Consultá y gestioná las postulaciones recibidas para los diferentes llamados públicos</p>
+    </div>
+</div>
+
+<search aria-label="Filtros de postulaciones">
+<form method="GET" action="{{ url_for('admin.postulaciones_admin') }}" class="vio-card p-5 mb-6 space-y-5">
+    <div class="flex flex-col gap-3 xl:flex-row xl:items-end">
+        <div class="flex-1">
+            <label class="vio-label" for="q">Buscar postulante</label>
+            <div class="relative">
+                <svg class="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-300/60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/></svg>
+                <input
+                    type="text"
+                    id="q"
+                    name="q"
+                    value="{{ search or '' }}"
+                    class="vio-input pl-11"
+                    placeholder="Nombre, documento, correo, teléfono o llamado..."
+                >
+            </div>
+        </div>
+
+        <div class="w-full xl:w-52">
+            <label class="vio-label" for="estado">Estado actual</label>
+            <select id="estado" name="estado" class="vio-input">
+                <option value="" {% if not estado_filtro %}selected{% endif %}>Todas</option>
+                <option value="preinscripta" {% if estado_filtro == 'preinscripta' %}selected{% endif %}>Preinscriptas</option>
+                <option value="recibida" {% if estado_filtro == 'recibida' %}selected{% endif %}>Recibidas</option>
+                <option value="en_revision" {% if estado_filtro == 'en_revision' %}selected{% endif %}>En revisión</option>
+                <option value="admitida" {% if estado_filtro == 'admitida' %}selected{% endif %}>Admitidas</option>
+                <option value="rechazada" {% if estado_filtro == 'rechazada' %}selected{% endif %}>Rechazadas</option>
+            </select>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 xl:pb-0.5">
+            <button type="submit" class="btn btn-primary">Aplicar filtros</button>
+            <a href="{{ url_for('admin.postulaciones_export_csv', estado=estado_filtro, q=search, area_convocante_id=area_convocante_id, concurso_id=concurso_id, tipo_contratacion_id=tipo_contratacion_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta) }}" class="btn btn-ghost">Descargar CSV</a>
+            {% if search or estado_filtro or area_convocante_id or tipo_contratacion_id or fecha_desde or fecha_hasta %}
+            <a href="{{ url_for('admin.postulaciones_admin') }}" class="btn btn-ghost">Limpiar</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_minmax(0,1fr)_160px_160px] gap-4 border-t border-blue-500/20 pt-5">
+        <div>
+            <label class="vio-label" for="area_convocante_id">Dirección / área</label>
+            <select id="area_convocante_id" name="area_convocante_id" class="vio-input">
+                <option value="">Todas las áreas</option>
+                {% for area in areas %}
+                <option value="{{ area.id }}" {% if area_convocante_id == area.id %}selected{% endif %}>{{ area.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            {% set llamados_del_area = llamados_por_area.get(area_convocante_id, []) %}
+            <label class="vio-label" for="concurso_id">Llamado</label>
+            <select id="concurso_id" name="concurso_id" class="vio-input disabled:cursor-not-allowed disabled:opacity-60" {% if not area_convocante_id %}disabled{% endif %}>
+                <option value="">
+                    {%- if not area_convocante_id -%}Elegí un área primero
+                    {%- elif llamados_del_area -%}Todos los llamados
+                    {%- else -%}No hay llamados en esta área
+                    {%- endif -%}
+                </option>
+                {% for llamado in llamados_del_area %}
+                <option value="{{ llamado.id }}" {% if concurso_id == llamado.id %}selected{% endif %}>{{ llamado.titulo }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="vio-label" for="tipo_contratacion_id">Tipo de vínculo</label>
+            <select id="tipo_contratacion_id" name="tipo_contratacion_id" class="vio-input">
+                <option value="">Todos los vínculos</option>
+                {% for tipo in tipos_contra %}
+                <option value="{{ tipo.id }}" {% if tipo_contratacion_id == tipo.id|string %}selected{% endif %}>{{ tipo.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="vio-label" for="fecha_desde">Desde</label>
+            <input type="date" id="fecha_desde" name="fecha_desde" value="{{ fecha_desde or '' }}" class="vio-input">
+        </div>
+
+        <div>
+            <label class="vio-label" for="fecha_hasta">Hasta</label>
+            <input type="date" id="fecha_hasta" name="fecha_hasta" value="{{ fecha_hasta or '' }}" class="vio-input">
+        </div>
+    </div>
+</form>
+</search>
+
+<div class="vio-card p-6 space-y-6">
+    <div class="flex flex-col sm:flex-row gap-4 justify-between items-center pb-4 border-b border-blue-500/20">
+        <div class="text-sm text-blue-300">
+            Mostrando <span class="font-bold text-white">{{ postulaciones|length }}</span> postulaciones en total
+        </div>
+    </div>
+
+    {% if postulaciones %}
+    <div class="overflow-x-auto">
+        <table class="vio-table">
+            <thead>
+                <tr>
+                    <th>Postulante</th>
+                    <th>Documento / Contacto</th>
+                    <th>Llamado / Concurso</th>
+                    <th>Estado</th>
+                    <th>Fecha</th>
+                    <th class="text-right">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for postu in postulaciones %}
+                <tr>
+                    <td>
+                        <div class="font-bold text-white">{{ postu.nombre_completo }}</div>
+                        <div class="text-xs text-blue-400/60 mt-0.5">ID: #{{ postu.id }}</div>
+                    </td>
+                    <td>
+                        <div class="text-sm text-slate-200">{{ postu.documento }}</div>
+                        <div class="text-xs text-blue-400/60">{{ postu.email }} &middot; {{ postu.telefono }}</div>
+                    </td>
+                    <td>
+                        <div class="font-medium text-blue-300 truncate max-w-xs">{{ postu.concurso.titulo }}</div>
+                        {% set estado_actual = postu.concurso.estado_publico %}
+                        <div class="text-xs text-blue-400/50">Cargos: {{ postu.concurso.cantidad_cargos }} &middot; {{ 'Próximo' if estado_actual == 'proximo' else estado_actual|replace('_', ' ')|capitalize }}</div>
+                    </td>
+                    <td>
+                        <span class="badge {% if postu.estado == 'preinscripta' %}badge-blue{% elif postu.estado == 'recibida' %}badge-gray{% elif postu.estado == 'en_revision' %}badge-amber{% elif postu.estado == 'admitida' %}badge-green{% else %}badge-red{% endif %}">
+                            {{ postu.estado }}
+                        </span>
+                    </td>
+                    <td class="text-xs text-slate-400">
+                        {{ postu.created_at.strftime('%d/%m/%Y %H:%M') }}
+                    </td>
+                    <td>
+                        <div class="flex justify-end">
+                            <a href="{{ url_for('admin.postulacion_detail', postulacion_id=postu.id) }}" class="btn btn-primary btn-sm">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                Revisar
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="rounded-xl border border-dashed border-blue-500/20 bg-blue-950/20 px-4 py-12 text-center text-sm text-blue-400/60">
+        No se encontraron postulaciones de este tipo en el sistema.
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script type="application/json" id="llamados-por-area">{{ llamados_por_area | tojson }}</script>
+<script>
+    const selectorArea = document.getElementById('area_convocante_id');
+    const selectorLlamado = document.getElementById('concurso_id');
+    const llamadosPorArea = JSON.parse(document.getElementById('llamados-por-area').textContent);
+
+    selectorArea.addEventListener('change', () => {
+        const area = selectorArea.value;
+        const llamados = llamadosPorArea[area] ?? [];
+        let opcionInicial = 'Elegí un área primero';
+        if (area) {
+            opcionInicial = llamados.length ? 'Todos los llamados' : 'No hay llamados en esta área';
+        }
+        selectorLlamado.replaceChildren(
+            new Option(opcionInicial, ''),
+            ...llamados.map(llamado => new Option(llamado.titulo, llamado.id)),
+        );
+        selectorLlamado.disabled = !area;
+    });
+</script>
+{% endblock %}

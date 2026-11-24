@@ -1,0 +1,539 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar concurso' if concurso else 'Nuevo Concurso' }}{% endblock %}
+
+{% macro selector_catalogo(clave, etiqueta, opcion_vacia, requerido=false) %}
+    {% set catalogo = catalogos[clave] %}
+    <div>
+        <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-2">
+            <label class="vio-label mb-0" for="{{ catalogo.campo }}">{{ etiqueta }}</label>
+            {% if current_user.is_superuser %}
+            <a href="{{ url_for('admin.catalogos_concursos', catalogo=clave) }}" target="_blank" rel="noopener"
+                data-alta-catalogo="{{ catalogo.campo }}" data-titulo="{{ catalogo.nuevo }}" data-maxlength="{{ catalogo.limite_nombre }}"
+                aria-label="{{ catalogo.nuevo }}" class="text-sm font-medium text-blue-300 hover:underline">Agregar</a>
+            {% endif %}
+        </div>
+        <select id="{{ catalogo.campo }}" name="{{ catalogo.campo }}" class="vio-input" {% if requerido %}required{% endif %}>
+            <option value="">{{ opcion_vacia }}</option>
+            {% for opcion in opciones[clave] %}
+            <option value="{{ opcion.id }}" {% if form_data.get(catalogo.campo)|string == opcion.id|string %}selected{% endif %}>{{ opcion.nombre }}{% if not opcion.is_active %} (inactivo){% endif %}</option>
+            {% endfor %}
+        </select>
+    </div>
+{% endmacro %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='admin-concurso.js') }}" defer></script>
+<link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet" integrity="sha384-ecIckRi4QlKYya/FQUbBUjS4qp65jF/J87Guw5uzTbO1C1Jfa/6kYmd6dXUF6D7i" crossorigin="anonymous">
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js" integrity="sha384-utBUCeG4SYaCm4m7GQZYr8Hy8Fpy3V4KGjBZaf4WTKOcwhCYpt/0PfeEe3HNlwx8" crossorigin="anonymous"></script>
+<style>
+    .ql-toolbar.ql-snow {
+        border: 1px solid rgba(59, 130, 246, 0.28);
+        border-bottom: 0;
+        border-radius: 0.75rem 0.75rem 0 0;
+        background: rgba(12, 23, 53, 0.95);
+    }
+    .ql-container.ql-snow {
+        border: 1px solid rgba(59, 130, 246, 0.28);
+        border-radius: 0 0 0.75rem 0.75rem;
+        min-height: 180px;
+        background: rgba(15, 23, 42, 0.7);
+    }
+    .ql-editor {
+        color: #e2e8f0;
+        font-size: 0.95rem;
+        line-height: 1.7;
+        min-height: 180px;
+    }
+    .ql-snow .ql-stroke { stroke: #93c5fd; }
+    .ql-snow .ql-fill { fill: #93c5fd; }
+    .ql-snow .ql-picker { color: #93c5fd; }
+    .ql-snow .ql-picker-options {
+        background: #0f172a;
+        border-color: rgba(59, 130, 246, 0.28);
+    }
+    .ql-editor.ql-blank::before {
+        color: rgba(147, 197, 253, 0.4);
+        font-style: normal;
+    }
+    .timeline-card {
+        border: 1px solid rgba(59, 130, 246, 0.18);
+        background: rgba(15, 23, 42, 0.55);
+        border-radius: 1rem;
+        padding: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set estado_actual = concurso.estado_publico if concurso else none %}
+<div class="flex flex-wrap items-center gap-3 mb-8">
+    <a href="{{ url_for('admin.concursos_admin') }}" class="text-blue-400/60 hover:text-blue-300 transition-colors" aria-label="Volver al listado de concursos">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    </a>
+    <div>
+        <h1 class="text-2xl font-extrabold text-white tracking-tight">{{ 'Editar Concurso' if concurso else 'Agregar Nuevo Concurso' }}</h1>
+        <p class="text-sm text-blue-400/70 mt-0.5">
+            {{ concurso.titulo if concurso else 'Registrá una nueva convocatoria y completá la misma información que consume el portal público.' }}
+        </p>
+    </div>
+    {% if concurso %}
+    <a class="btn btn-ghost" href="{{ url_for('admin.concurso_actualizaciones', concurso_id=concurso.id) }}">Comunicados por etapa</a>
+    {% endif %}
+</div>
+
+<form method="POST" enctype="multipart/form-data" id="concurso-form" class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="xl:col-span-2 space-y-6">
+        <div class="vio-card p-6 space-y-6">
+            <div>
+                <h2 class="text-lg font-bold text-white">Datos principales</h2>
+                <p class="text-xs text-blue-400/60 mt-1">Se muestran en la ficha pública del concurso.</p>
+            </div>
+
+            <div>
+                <label class="vio-label" for="titulo">Título de la convocatoria</label>
+                <input type="text" id="titulo" name="titulo" value="{{ form_data.get('titulo', '') }}" class="vio-input" placeholder="Ej.: Operario Zafral de Campings y Balnearios" maxlength="300" required>
+            </div>
+
+            <div>
+                <label class="vio-label" for="slug">Slug de la publicación</label>
+                <p id="slug-ayuda" class="mb-2 text-sm text-blue-300">
+                    {% if concurso %}Define la dirección pública del llamado. Si lo cambiás, los enlaces anteriores dejan de funcionar.
+                    {% else %}Es la parte final de la dirección pública. Podés usar la sugerencia del título o escribir tu propio slug.{% endif %}
+                </p>
+                <input type="text" id="slug" name="slug" value="{{ form_data.get('slug', '') }}"
+                    class="vio-input aria-invalid:border-red-400" placeholder="operario-zafral" maxlength="{{ slug_max_length }}"
+                    autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
+                    aria-invalid="{{ 'true' if slug_error else 'false' }}" aria-describedby="slug-ayuda{% if slug_error %} slug-estado{% endif %}"
+                    data-url-verificacion="{{ url_for('admin.concurso_slug_disponible', concurso_id=concurso.id if concurso else none) }}"
+                    data-sugerir-desde-titulo="{{ 'false' if concurso else 'true' }}" {% if slug_error %}autofocus{% endif %}>
+                <p id="slug-estado" role="status" data-estado="{{ 'error' if slug_error else '' }}"
+                    class="mt-1 min-h-5 wrap-anywhere text-sm text-blue-300 data-[estado=error]:text-red-300 data-[estado=disponible]:text-emerald-300">{{ slug_error or '' }}</p>
+            </div>
+
+            <div>
+                <label class="vio-label" for="subtitulo">Subtítulo</label>
+                <input type="text" id="subtitulo" name="subtitulo" value="{{ form_data.get('subtitulo', '') }}" class="vio-input" placeholder="Resumen breve que se ve bajo el título en el portal público">
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {{ selector_catalogo('areas', 'Área convocante', 'Elegí un área', true) }}
+                {{ selector_catalogo('tipos-vinculo', 'Tipo de vínculo', 'Elegí un vínculo', true) }}
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {{ selector_catalogo('tipos-llamado', 'Clasificación de llamado', 'Sin definir') }}
+                <div>
+                    <div class="flex flex-wrap items-baseline justify-between gap-x-2">
+                        <label class="vio-label" for="estado">Estado configurado</label>
+                        {% if concurso %}
+                        <p class="text-xs text-blue-300">Estado actual <strong class="text-white">{{ 'Próximo' if estado_actual == 'proximo' else estado_actual|replace('_', ' ')|capitalize }}</strong></p>
+                        {% endif %}
+                    </div>
+                    <select id="estado" name="estado" class="vio-input" aria-describedby="estado-ayuda">
+                        <option value="borrador" {% if form_data.get('estado') == 'borrador' %}selected{% endif %}>Borrador</option>
+                        <option value="proximo" {% if form_data.get('estado') == 'proximo' %}selected{% endif %}>Próximo / Sin abrir</option>
+                        <option value="abierto" {% if form_data.get('estado') == 'abierto' %}selected{% endif %}>Abierto según fechas</option>
+                        <option value="en_proceso" {% if form_data.get('estado') == 'en_proceso' %}selected{% endif %}>En proceso</option>
+                        <option value="finalizado" {% if form_data.get('estado') == 'finalizado' %}selected{% endif %}>Finalizado</option>
+                        <option value="suspendido" {% if form_data.get('estado') == 'suspendido' %}selected{% endif %}>Suspendido</option>
+                        <option value="archivado" {% if form_data.get('estado') == 'archivado' %}selected{% endif %}>Archivado</option>
+                    </select>
+                    <p id="estado-ayuda" class="text-sm text-blue-300/80 mt-2">Elegí Abierto según fechas para abrir el llamado a la hora programada y pasarlo a En proceso al cierre.</p>
+                </div>
+            </div>
+
+            <label class="flex items-start gap-3 rounded-xl border border-blue-500/20 bg-blue-950/30 p-3 cursor-pointer">
+                <input type="checkbox" name="postulacion_web_habilitada" class="mt-1 rounded border-blue-500/40 bg-blue-950/60 text-blue-500 focus:ring-blue-500" {% if form_data.get('postulacion_web_habilitada') == 'on' %}checked{% endif %}>
+                <span>
+                    <span class="block text-sm font-semibold text-white">Habilitar formulario web de postulación</span>
+                    <span class="block text-sm text-blue-300/80 mt-1">Permite recibir postulaciones dentro del plazo. Para inscripciones por correo o presenciales, indicá los canales en Forma de postulación.</span>
+                </span>
+            </label>
+
+            <label class="flex items-start gap-3 rounded-xl border border-orange-500/20 bg-orange-950/30 p-3 cursor-pointer">
+                <input type="checkbox" name="requiere_18_anos" class="mt-1 rounded border-orange-500/40 bg-orange-950/60 text-orange-500 focus:ring-orange-500" {% if form_data.get('requiere_18_anos') == 'on' %}checked{% endif %}>
+                <span>
+                    <span class="block text-sm font-semibold text-white">Restringir a mayores de 18 años</span>
+                    <span class="block text-xs text-orange-400/60 mt-1">Se usará en la validación del formulario web de postulación.</span>
+                </span>
+            </label>
+        </div>
+
+        <div class="vio-card p-6 space-y-6">
+            <div>
+                <h2 class="text-lg font-bold text-white">Contenido público del concurso</h2>
+                <p class="text-xs text-blue-400/60 mt-1">Estos bloques alimentan las secciones del detalle público exactamente como las consume el frontend.</p>
+            </div>
+
+            <div>
+                <label class="vio-label" for="descripcion">Descripción</label>
+                <input type="hidden" id="descripcion" name="descripcion" value="{{ form_data.get('descripcion', '')|e }}">
+                <div id="descripcion_editor"></div>
+            </div>
+
+            <div>
+                <label class="vio-label" for="requisitos_excluyentes">Requisitos excluyentes</label>
+                <input type="hidden" id="requisitos_excluyentes" name="requisitos_excluyentes" value="{{ form_data.get('requisitos_excluyentes', '')|e }}">
+                <div id="requisitos_excluyentes_editor"></div>
+            </div>
+
+            <div>
+                <label class="vio-label" for="requisitos_valorados">Requisitos valorados</label>
+                <input type="hidden" id="requisitos_valorados" name="requisitos_valorados" value="{{ form_data.get('requisitos_valorados', '')|e }}">
+                <div id="requisitos_valorados_editor"></div>
+            </div>
+
+            <div>
+                <label class="vio-label" for="perfil_buscado">Perfil buscado</label>
+                <input type="hidden" id="perfil_buscado" name="perfil_buscado" value="{{ form_data.get('perfil_buscado', '')|e }}">
+                <div id="perfil_buscado_editor"></div>
+            </div>
+
+            <div>
+                <label class="vio-label" for="tareas_funciones">Tareas y funciones</label>
+                <input type="hidden" id="tareas_funciones" name="tareas_funciones" value="{{ form_data.get('tareas_funciones', '')|e }}">
+                <div id="tareas_funciones_editor"></div>
+            </div>
+
+            <div>
+                <label class="vio-label" for="documentacion_requerida">Documentación requerida</label>
+                <input type="hidden" id="documentacion_requerida" name="documentacion_requerida" value="{{ form_data.get('documentacion_requerida', '')|e }}">
+                <div id="documentacion_requerida_editor"></div>
+            </div>
+
+            <div>
+                <label class="vio-label" for="forma_postulacion">Forma de postulación</label>
+                <input type="hidden" id="forma_postulacion" name="forma_postulacion" value="{{ form_data.get('forma_postulacion', '')|e }}">
+                <div id="forma_postulacion_editor"></div>
+            </div>
+
+            <div>
+                <label class="vio-label" for="normativa">Normativa</label>
+                <input type="hidden" id="normativa" name="normativa" value="{{ form_data.get('normativa', '')|e }}">
+                <div id="normativa_editor"></div>
+            </div>
+        </div>
+
+        <div class="vio-card p-6 space-y-6">
+            <div>
+                <h2 class="text-lg font-bold text-white">Documentos y contenido de bases</h2>
+                <p class="text-xs text-blue-400/60 mt-1">El frontend público usa estos bloques para mostrar páginas internas, descargas y anexos del concurso.</p>
+            </div>
+
+            <div>
+                <label class="vio-label" for="bases_concurso_html">Bases del concurso</label>
+                <input type="hidden" id="bases_concurso_html" name="bases_concurso_html" value="{{ form_data.get('bases_concurso_html', '')|e }}">
+                <div id="bases_concurso_editor"></div>
+            </div>
+
+            <div>
+                <label class="vio-label" for="bases_llamado_html">Bases del llamado</label>
+                <input type="hidden" id="bases_llamado_html" name="bases_llamado_html" value="{{ form_data.get('bases_llamado_html', '')|e }}">
+                <div id="bases_llamado_editor"></div>
+            </div>
+
+            <div>
+                <label class="vio-label" for="anexo_declaracion_jurada_html">Resolución</label>
+                <input type="hidden" id="anexo_declaracion_jurada_html" name="anexo_declaracion_jurada_html" value="{{ form_data.get('anexo_declaracion_jurada_html', '')|e }}">
+                <div id="anexo_declaracion_jurada_editor"></div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="vio-label" for="bases_concurso_pdf">PDF bases del concurso</label>
+                    <input type="file" id="bases_concurso_pdf" name="bases_concurso_pdf" accept=".pdf,application/pdf" class="vio-input py-2 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-500/20 file:text-blue-300 hover:file:bg-blue-500/30 cursor-pointer">
+                    {% if concurso and concurso.document_download_source('bases-concurso') %}
+                    <a class="mt-2 inline-block text-sm text-blue-300 underline" href="{{ url_for('admin.concurso_documento_adjunto', concurso_id=concurso.id, documento_slug='bases-concurso') }}">Descargar bases del concurso</a>
+                    {% endif %}
+                </div>
+                <div>
+                    <label class="vio-label" for="bases_llamado_pdf">PDF bases del llamado</label>
+                    <input type="file" id="bases_llamado_pdf" name="bases_llamado_pdf" accept=".pdf,application/pdf" class="vio-input py-2 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-500/20 file:text-blue-300 hover:file:bg-blue-500/30 cursor-pointer">
+                    {% if concurso and concurso.document_download_source('bases-llamado') %}
+                    <a class="mt-2 inline-block text-sm text-blue-300 underline" href="{{ url_for('admin.concurso_documento_adjunto', concurso_id=concurso.id, documento_slug='bases-llamado') }}">Descargar bases del llamado</a>
+                    {% endif %}
+                </div>
+                <div>
+                    <label class="vio-label" for="anexo_pdf">PDF resolución</label>
+                    <input type="file" id="anexo_pdf" name="anexo_pdf" accept=".pdf,application/pdf" class="vio-input py-2 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-500/20 file:text-blue-300 hover:file:bg-blue-500/30 cursor-pointer">
+                    {% if concurso and concurso.document_download_source('anexo-declaracion-jurada') %}
+                    <a class="mt-2 inline-block text-sm text-blue-300 underline" href="{{ url_for('admin.concurso_documento_adjunto', concurso_id=concurso.id, documento_slug='anexo-declaracion-jurada') }}">Descargar resolución</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="space-y-6">
+        <div class="vio-card p-6 space-y-4">
+            <div>
+                <h2 class="text-lg font-bold text-white">Parámetros y fechas</h2>
+                <p class="text-xs text-blue-400/60 mt-1">Se reflejan en la cabecera pública y en el seguimiento del llamado.</p>
+            </div>
+
+            <div>
+                <label class="vio-label" for="cantidad_cargos">Cantidad de vacantes / cargos</label>
+                <input type="number" id="cantidad_cargos" name="cantidad_cargos" value="{{ form_data.get('cantidad_cargos', 1) }}" min="1" class="vio-input" required>
+            </div>
+
+            <div>
+                <label class="vio-label" for="remuneracion">Remuneración mensual</label>
+                <input type="text" id="remuneracion" name="remuneracion" value="{{ form_data.get('remuneracion', '') }}" class="vio-input" placeholder="Ej.: $ 42.000 nominales">
+            </div>
+
+            <div>
+                <label class="vio-label" for="localidad">Localidad</label>
+                <input type="text" id="localidad" name="localidad" value="{{ form_data.get('localidad', '') }}" class="vio-input" placeholder="Ej.: Minas">
+            </div>
+
+            <div>
+                <label class="vio-label" for="contacto_consulta">Contacto para consultas</label>
+                <textarea id="contacto_consulta" name="contacto_consulta" rows="4" class="vio-input" placeholder="Correo, teléfono interno o canal oficial de consultas">{{ form_data.get('contacto_consulta', '') }}</textarea>
+            </div>
+
+            <div>
+                <label class="vio-label" for="fecha_apertura">Apertura de inscripciones (hora de Uruguay)</label>
+                <input type="datetime-local" id="fecha_apertura" name="fecha_apertura" value="{{ form_data.get('fecha_apertura', '') }}" class="vio-input" required>
+            </div>
+
+            <div>
+                <label class="vio-label" for="fecha_cierre">Cierre de inscripciones (hora de Uruguay)</label>
+                <input type="datetime-local" id="fecha_cierre" name="fecha_cierre" value="{{ form_data.get('fecha_cierre', '') }}" class="vio-input" required>
+            </div>
+
+            <div>
+                <label class="vio-label" for="fecha_resolucion_estimada">Fecha de resolución estimada</label>
+                <input type="datetime-local" id="fecha_resolucion_estimada" name="fecha_resolucion_estimada" value="{{ form_data.get('fecha_resolucion_estimada', '') }}" class="vio-input">
+            </div>
+        </div>
+
+        <div class="vio-card p-6 space-y-4">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-bold text-white">Cronograma público</h2>
+                    <p class="text-xs text-blue-400/60 mt-1">Estos hitos alimentan el componente de cronograma del frontend.</p>
+                </div>
+                <button type="button" id="add-timeline-item" class="btn btn-ghost btn-sm">Agregar hito</button>
+            </div>
+
+            <input type="hidden" id="timeline_json" name="timeline_json" value="{{ form_data.get('timeline_json', '')|e }}">
+            <div id="timeline-items" class="space-y-3"></div>
+            <p id="timeline-empty" class="text-xs text-blue-400/60">Todavía no hay hitos cargados. Agregá fechas clave para que el frontend muestre el cronograma.</p>
+        </div>
+
+        {% if concurso %}
+        <div class="rounded-xl border border-blue-500/20 bg-blue-950/40 p-3 text-sm">
+            <p class="text-xs uppercase tracking-wider text-blue-400/60 mb-1">Postulación web</p>
+            <p class="text-white font-semibold">{{ 'Disponible' if estado_actual == 'abierto' and concurso.postulacion_web_habilitada() else 'No disponible' }}</p>
+        </div>
+        {% endif %}
+
+        <div class="flex items-center gap-3">
+            <button type="submit" class="btn btn-primary flex-1 justify-center">{{ 'Guardar cambios' if concurso else 'Crear Concurso' }}</button>
+            <a href="{{ url_for('admin.concursos_admin') }}" class="btn btn-ghost">Cancelar</a>
+        </div>
+    </div>
+</form>
+
+{% if current_user.is_superuser %}
+<dialog id="alta-catalogo-dialog" class="vio-card fixed inset-0 m-auto overflow-y-auto p-6 text-slate-200" aria-labelledby="alta-catalogo-titulo">
+    <h1 id="alta-catalogo-titulo" class="text-xl font-bold text-white"></h1>
+    <form id="alta-catalogo-form" method="POST" aria-labelledby="alta-catalogo-titulo" class="mt-5 space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div>
+            <label class="vio-label" for="alta-catalogo-nombre">Nombre</label>
+            <input id="alta-catalogo-nombre" name="nombre" class="vio-input" type="text" required autofocus>
+        </div>
+        <div>
+            <label class="vio-label" for="alta-catalogo-descripcion">Descripción (opcional)</label>
+            <textarea id="alta-catalogo-descripcion" name="descripcion" class="vio-input" rows="3"></textarea>
+        </div>
+        <p id="alta-catalogo-estado" class="text-sm text-red-300" role="status"></p>
+        <div class="flex flex-wrap justify-end gap-3">
+            <button type="submit" form="alta-catalogo-cancelar" class="btn btn-ghost">Cancelar</button>
+            <button type="submit" class="btn btn-primary" id="alta-catalogo-guardar">Agregar al catálogo</button>
+        </div>
+    </form>
+    <form id="alta-catalogo-cancelar" method="dialog"></form>
+</dialog>
+<p id="alta-catalogo-confirmacion" class="sr-only" role="status"></p>
+{% endif %}
+
+<script>
+    const editorConfigs = [
+        ['descripcion_editor', 'descripcion'],
+        ['requisitos_excluyentes_editor', 'requisitos_excluyentes'],
+        ['requisitos_valorados_editor', 'requisitos_valorados'],
+        ['perfil_buscado_editor', 'perfil_buscado'],
+        ['tareas_funciones_editor', 'tareas_funciones'],
+        ['documentacion_requerida_editor', 'documentacion_requerida'],
+        ['forma_postulacion_editor', 'forma_postulacion'],
+        ['normativa_editor', 'normativa'],
+        ['bases_concurso_editor', 'bases_concurso_html'],
+        ['bases_llamado_editor', 'bases_llamado_html'],
+        ['anexo_declaracion_jurada_editor', 'anexo_declaracion_jurada_html'],
+    ];
+
+    const timelineHiddenInput = document.getElementById('timeline_json');
+    const timelineContainer = document.getElementById('timeline-items');
+    const timelineEmptyState = document.getElementById('timeline-empty');
+    const addTimelineButton = document.getElementById('add-timeline-item');
+    let nextTimelineIndex = 0;
+
+    function createEditor(editorId, inputId) {
+        const hiddenInput = document.getElementById(inputId);
+        const label = document.querySelector('label[for="' + inputId + '"]');
+        if (typeof Quill === 'undefined') {
+            const editor = document.createElement('textarea');
+            editor.id = inputId;
+            editor.name = hiddenInput.name;
+            editor.value = hiddenInput.value;
+            editor.className = 'vio-input';
+            editor.rows = 5;
+            hiddenInput.replaceWith(editor);
+            return;
+        }
+        const quill = new Quill(`#${editorId}`, {
+            theme: 'snow',
+            modules: {
+                toolbar: [
+                    [{ header: [1, 2, 3, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ list: 'ordered' }, { list: 'bullet' }],
+                    ['blockquote', 'link'],
+                    ['clean'],
+                ],
+            },
+        });
+
+        label.id = inputId + '-label';
+        quill.root.setAttribute('role', 'textbox');
+        quill.root.setAttribute('aria-multiline', 'true');
+        quill.root.setAttribute('aria-labelledby', label.id);
+        label.addEventListener('click', () => quill.focus());
+
+        if (hiddenInput.value) {
+            quill.setContents(quill.clipboard.convert({ html: hiddenInput.value }), 'silent');
+            quill.history.clear();
+        }
+
+        quill.on('text-change', () => {
+            hiddenInput.value = quill.getSemanticHTML();
+        });
+    }
+
+    function createTimelineItem(item = {}) {
+        const wrapper = document.createElement('div');
+        const id = 'hito-' + nextTimelineIndex++;
+        wrapper.className = 'timeline-card space-y-3';
+        wrapper.dataset.timelineItem = 'true';
+        wrapper.innerHTML = `
+            <div class="flex items-center justify-between gap-3">
+                <p class="text-sm font-semibold text-white">Hito del cronograma</p>
+                <button type="button" class="text-xs text-red-300 hover:text-red-200" data-remove-timeline>Eliminar</button>
+            </div>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                    <label class="vio-label" for="${id}-fecha">Fecha del hito</label>
+                    <input id="${id}-fecha" type="date" class="vio-input" data-timeline-field="fecha">
+                </div>
+                <div>
+                    <label class="vio-label" for="${id}-titulo">Título del hito</label>
+                    <input id="${id}-titulo" type="text" class="vio-input" data-timeline-field="titulo" placeholder="Ej.: Cierre de postulaciones">
+                </div>
+            </div>
+            <div>
+                <label class="vio-label" for="${id}-descripcion">Descripción del hito</label>
+                <textarea id="${id}-descripcion" rows="3" class="vio-input" data-timeline-field="descripcion" placeholder="Detalle opcional que verá el postulante"></textarea>
+            </div>
+            <label class="flex items-center gap-3 text-sm text-blue-100">
+                <input type="checkbox" class="rounded border-blue-500/40 bg-blue-950/60 text-blue-500 focus:ring-blue-500" data-timeline-field="completado">
+                Marcar como completado
+            </label>
+        `;
+
+        wrapper.querySelector('[data-timeline-field="fecha"]').value = item.fecha || '';
+        wrapper.querySelector('[data-timeline-field="titulo"]').value = item.titulo || '';
+        wrapper.querySelector('[data-timeline-field="descripcion"]').value = item.descripcion || '';
+        wrapper.querySelector('[data-timeline-field="completado"]').checked = Boolean(item.completado);
+        timelineContainer.appendChild(wrapper);
+        syncTimelineEmptyState();
+    }
+
+    function syncTimelineEmptyState() {
+        timelineEmptyState.classList.toggle(
+            'hidden',
+            timelineContainer.querySelectorAll('[data-timeline-item]').length > 0,
+        );
+    }
+
+    function serializeTimeline() {
+        const items = Array.from(
+            timelineContainer.querySelectorAll('[data-timeline-item]'),
+        ).map((item) => {
+            return {
+                fecha: item.querySelector('[data-timeline-field="fecha"]').value,
+                titulo: item.querySelector('[data-timeline-field="titulo"]').value.trim(),
+                descripcion: item.querySelector('[data-timeline-field="descripcion"]').value.trim(),
+                completado: item.querySelector('[data-timeline-field="completado"]').checked,
+            };
+        }).filter((item) => item.fecha || item.titulo || item.descripcion);
+
+        timelineHiddenInput.value = items.length ? JSON.stringify(items) : '';
+        syncTimelineEmptyState();
+    }
+
+    function loadTimelineItems() {
+        if (!timelineHiddenInput.value) {
+            syncTimelineEmptyState();
+            return;
+        }
+
+        try {
+            const items = JSON.parse(timelineHiddenInput.value);
+            if (!Array.isArray(items)) {
+                syncTimelineEmptyState();
+                return;
+            }
+
+            items.forEach((item) => createTimelineItem(item));
+            serializeTimeline();
+        } catch (error) {
+            syncTimelineEmptyState();
+        }
+    }
+
+    window.addEventListener('load', () => {
+        editorConfigs.forEach(([editorId, inputId]) => createEditor(editorId, inputId));
+        loadTimelineItems();
+    });
+
+    addTimelineButton.addEventListener('click', () => {
+        createTimelineItem();
+        serializeTimeline();
+    });
+
+    timelineContainer.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+            return;
+        }
+        if (!target.matches('[data-remove-timeline]')) {
+            return;
+        }
+
+        const wrapper = target.closest('[data-timeline-item]');
+        if (wrapper) {
+            wrapper.remove();
+            serializeTimeline();
+        }
+    });
+
+    timelineContainer.addEventListener('input', serializeTimeline);
+    timelineContainer.addEventListener('change', serializeTimeline);
+
+    document.getElementById('concurso-form').addEventListener('submit', serializeTimeline);
+</script>
+{% endblock %}

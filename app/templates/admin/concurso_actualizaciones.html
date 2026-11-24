@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Comunicados por etapa | {{ concurso.titulo }}{% endblock %}
+
+{% block content %}
+<header class="mb-6 space-y-3">
+    <a href="{{ url_for('admin.concurso_edit', concurso_id=concurso.id) }}" class="btn btn-ghost">Volver a editar el llamado</a>
+    <h1 class="text-2xl font-extrabold text-white">Comunicados por etapa</h1>
+    <p class="text-blue-300">{{ concurso.titulo }}</p>
+    {% if concurso.estado == 'borrador' %}
+    <p class="text-sm text-blue-300/80">Los comunicados serán visibles cuando publiques el llamado y marques cada uno como visible.</p>
+    {% endif %}
+</header>
+
+<div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+    <section class="vio-card p-5 sm:p-6">
+        <h2 class="mb-4 text-lg font-bold text-white">{{ 'Editar comunicado' if actualizacion else 'Nuevo comunicado' }}</h2>
+        <form method="post" enctype="multipart/form-data" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div>
+                <label class="vio-label" for="etapa">Etapa</label>
+                <select class="vio-input" id="etapa" name="etapa" required>
+                    {% for value, label in etapas.items() %}
+                    <option value="{{ value }}"{% if value == values.etapa %} selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="vio-label" for="titulo">Título del comunicado</label>
+                <input class="vio-input" id="titulo" name="titulo" value="{{ values.titulo }}" maxlength="200" required>
+            </div>
+            <div>
+                <label class="vio-label" for="fecha">Fecha del comunicado</label>
+                <input class="vio-input" type="date" id="fecha" name="fecha" value="{{ values.fecha }}" required>
+            </div>
+            <div>
+                <label class="vio-label" for="descripcion">Texto público (opcional)</label>
+                <textarea class="vio-input" id="descripcion" name="descripcion" rows="6" maxlength="12000">{{ values.descripcion }}</textarea>
+            </div>
+            <div>
+                <label class="vio-label" for="pdf">PDF para publicar (opcional)</label>
+                <input class="vio-input" type="file" id="pdf" name="pdf" accept=".pdf,application/pdf">
+                {% if actualizacion and actualizacion.pdf_key %}
+                <a class="mt-2 inline-block text-sm text-blue-300 underline" href="{{ url_for('admin.concurso_actualizacion_adjunto', concurso_id=concurso.id, actualizacion_id=actualizacion.id) }}">Descargar PDF actual</a>
+                {% endif %}
+            </div>
+            <label class="flex items-center gap-3 rounded-lg border border-blue-500/30 p-3">
+                <input type="checkbox" name="publicada"{% if values.publicada %} checked{% endif %}>
+                <span class="font-semibold text-white">Mostrar en la ficha pública</span>
+            </label>
+            <div class="flex flex-wrap gap-3">
+                <button type="submit" class="btn btn-primary">Guardar comunicado</button>
+                {% if actualizacion %}
+                <a class="btn btn-ghost" href="{{ url_for('admin.concurso_actualizaciones', concurso_id=concurso.id) }}">Nuevo comunicado</a>
+                {% endif %}
+            </div>
+        </form>
+    </section>
+
+    <section class="vio-card p-5 sm:p-6">
+        <h2 class="mb-4 text-lg font-bold text-white">Historial de comunicados</h2>
+        {% if actualizaciones %}
+        <ul class="space-y-3" role="list">
+            {% for item in actualizaciones %}
+            <li class="rounded-lg border border-blue-500/20 p-4">
+                <h3 class="font-bold text-white">{{ item.titulo }}</h3>
+                <p class="mt-1 text-sm text-blue-300">{{ etapas[item.etapa] }} · <time datetime="{{ item.fecha.isoformat() }}">{{ item.fecha.strftime('%d/%m/%Y') }}</time></p>
+                <div class="mt-3 flex flex-wrap items-center gap-3">
+                    <span class="badge {{ 'badge-green' if item.publicada and concurso.estado != 'borrador' else 'badge-gray' }}">{{ 'Visible' if item.publicada and concurso.estado != 'borrador' else 'Borrador' }}</span>
+                    <a class="btn btn-ghost" href="{{ url_for('admin.concurso_actualizaciones', concurso_id=concurso.id, actualizacion_id=item.id) }}">Editar <span class="sr-only">{{ item.titulo }}</span></a>
+                    {% if item.pdf_key %}
+                    <a class="btn btn-ghost" href="{{ url_for('admin.concurso_actualizacion_adjunto', concurso_id=concurso.id, actualizacion_id=item.id) }}">Descargar PDF <span class="sr-only">de {{ item.titulo }}</span></a>
+                    {% endif %}
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-blue-300/80">Todavía no hay comunicados para este llamado.</p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

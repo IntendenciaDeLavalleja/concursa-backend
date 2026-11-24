@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}Usuarios{% endblock %}
+{% block content %}
+
+{% set editando = usuario_editado is not none %}
+{% set cuenta_propia = editando and usuario_editado.id == current_user.id %}
+{% set primer_error = errores|first if errores else none %}
+
+<div class="mb-6">
+    <h1 class="text-2xl font-extrabold text-white tracking-tight">Usuarios</h1>
+    <p class="text-sm text-blue-400/75 mt-1">Administrá el acceso del equipo al panel.</p>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)] 2xl:grid-cols-[380px_minmax(0,1fr)] gap-6 items-start">
+    <section id="gestion-usuario" class="vio-card scroll-mt-20 p-6">
+        <h2 id="gestion-usuario-titulo" class="text-xl font-bold text-white mb-5">{{ 'Editar usuario' if editando else 'Nuevo usuario' }}</h2>
+        <form id="formulario-usuario" method="POST" aria-labelledby="gestion-usuario-titulo" class="space-y-4"
+              action="{{ url_for('admin.users', usuario_id=usuario_editado.id) if editando else url_for('admin.users') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            {% if errores.general %}
+            <p class="flash-error rounded-lg px-3 py-2 text-sm" role="alert" tabindex="-1" autofocus>{{ errores.general }}</p>
+            {% endif %}
+
+            <div>
+                <label class="vio-label" for="username">Nombre de usuario</label>
+                <input id="username" name="username" type="text" class="vio-input" value="{{ datos.username }}"
+                       minlength="2" maxlength="64" autocomplete="off" spellcheck="false"
+                       autocorrect="off" autocapitalize="none" required
+                       {% if primer_error == 'username' %}autofocus{% endif %}
+                       {% if errores.username %}aria-invalid="true" aria-describedby="username-error"{% endif %}>
+                {% if errores.username %}
+                <p id="username-error" class="mt-1 text-sm text-red-300">{{ errores.username }}</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label class="vio-label" for="email">Correo electrónico</label>
+                <input id="email" name="email" type="email" class="vio-input" value="{{ datos.email }}"
+                       maxlength="120" autocomplete="section-usuarios username" spellcheck="false"
+                       autocorrect="off" autocapitalize="none" required
+                       {% if primer_error == 'email' %}autofocus{% endif %}
+                       {% if errores.email %}aria-invalid="true" aria-describedby="email-error"{% endif %}>
+                {% if errores.email %}
+                <p id="email-error" class="mt-1 text-sm text-red-300">{{ errores.email }}</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label class="vio-label" for="password">{{ 'Nueva contraseña (opcional)' if editando else 'Contraseña' }}</label>
+                <input id="password" name="password" type="password" class="vio-input"
+                       minlength="8" autocomplete="new-password" {% if not editando %}required{% endif %}
+                       aria-describedby="password-help{% if errores.password %} password-error{% endif %}"
+                       {% if primer_error == 'password' %}autofocus{% endif %}
+                       {% if errores.password %}aria-invalid="true"{% endif %}>
+                <p id="password-help" class="mt-1 text-sm text-blue-300">Al menos 8 caracteres, con una letra y un número.</p>
+                {% if errores.password %}
+                <p id="password-error" class="mt-1 text-sm text-red-300">{{ errores.password }}</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label class="vio-label" for="role">Rol</label>
+                <select id="role" name="role" class="vio-input" required
+                        {% if primer_error == 'role' %}autofocus{% endif %}
+                        {% if errores.role %}aria-invalid="true" aria-describedby="role-error"{% endif %}>
+                    {% for valor, etiqueta in roles.items() %}
+                    <option value="{{ valor }}" {% if valor == ('super_admin' if cuenta_propia else datos.role) %}selected{% endif %}
+                            {% if cuenta_propia and valor != 'super_admin' %}disabled{% endif %}>{{ etiqueta }}</option>
+                    {% endfor %}
+                </select>
+                {% if errores.role %}
+                <p id="role-error" class="mt-1 text-sm text-red-300">{{ errores.role }}</p>
+                {% endif %}
+            </div>
+
+            <div class="flex flex-wrap gap-3">
+                <button type="submit" class="btn btn-primary flex-1 justify-center">{{ 'Guardar cambios' if editando else 'Crear usuario' }}</button>
+                {% if editando %}
+                <a href="{{ url_for('admin.users') }}" class="btn btn-ghost">Cancelar</a>
+                {% endif %}
+            </div>
+        </form>
+    </section>
+
+    <section id="cuentas-usuarios" class="vio-card min-w-0 p-6">
+        <h2 id="cuentas-titulo" class="text-xl font-bold text-white mb-4">Cuentas del panel</h2>
+        <div class="overflow-x-auto">
+            <table class="vio-table" aria-labelledby="cuentas-titulo">
+                <thead>
+                    <tr>
+                        <th scope="col">Usuario</th>
+                        <th scope="col">Rol</th>
+                        <th scope="col">Estado</th>
+                        <th scope="col">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for usuario in pagination.items %}
+                    <tr>
+                        <td>
+                            <div class="font-semibold text-white break-words">
+                                {{ usuario.username }}
+                                {% if usuario.id == current_user.id %}<span class="ml-1 text-xs font-normal text-blue-300">(Tu cuenta)</span>{% endif %}
+                            </div>
+                            <div class="text-sm text-blue-300 break-all">{{ usuario.email }}</div>
+                        </td>
+                        <td class="text-sm text-slate-200">{{ roles['super_admin' if usuario.is_superuser else 'admin'] }}</td>
+                        <td>
+                            <span class="badge {{ 'badge-green' if usuario.is_active else 'badge-gray' }}">
+                                {{ 'Activo' if usuario.is_active else 'Inactivo' }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="flex justify-end gap-2">
+                                <a href="{{ url_for('admin.users', usuario_id=usuario.id, _anchor='gestion-usuario') }}"
+                                   class="btn btn-ghost btn-sm" aria-label="Editar a {{ usuario.username }}">Editar</a>
+                                {% if usuario.id != current_user.id %}
+                                <a href="{{ url_for('admin.user_delete', usuario_id=usuario.id) }}"
+                                   class="btn btn-outline-danger btn-sm" aria-label="Eliminar a {{ usuario.username }}"
+                                   data-eliminar-usuario="{{ usuario.username }}">Eliminar</a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="text-center text-sm text-blue-300">No hay usuarios en esta página.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if pagination.pages > 1 %}
+        <nav class="mt-5 flex items-center justify-center flex-wrap gap-3 text-sm text-blue-300" aria-label="Paginación de usuarios">
+            {% if pagination.has_prev %}
+            <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.users', page=pagination.prev_num) }}">Anterior</a>
+            {% endif %}
+            <span>Página {{ pagination.page }} de {{ pagination.pages }}</span>
+            {% if pagination.has_next %}
+            <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.users', page=pagination.next_num) }}">Siguiente</a>
+            {% endif %}
+        </nav>
+        {% endif %}
+    </section>
+</div>
+
+<dialog id="eliminar-usuario-dialog" class="vio-card fixed inset-0 m-auto overflow-y-auto p-6 text-slate-200"
+        aria-labelledby="eliminar-usuario-titulo" aria-describedby="eliminar-usuario-aviso">
+    <h1 id="eliminar-usuario-titulo" class="text-xl font-bold text-white">¿Eliminar usuario?</h1>
+    <p id="eliminar-usuario-aviso" class="mt-3 break-words text-sm">
+        Vas a eliminar la cuenta de «<strong id="eliminar-usuario-nombre"></strong>».
+        Perderá el acceso al panel. Esta acción es permanente.
+    </p>
+    <div class="mt-6 flex flex-wrap justify-end gap-3">
+        <form method="dialog" aria-label="Cancelar eliminación">
+            <button type="submit" class="btn btn-ghost" autofocus>Cancelar</button>
+        </form>
+        <form id="eliminar-usuario-form" method="POST" aria-labelledby="eliminar-usuario-titulo">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="confirmar" value="1">
+            <button type="submit" class="btn btn-danger">Eliminar usuario</button>
+        </form>
+    </div>
+</dialog>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const eliminarUsuarioDialog = document.getElementById('eliminar-usuario-dialog');
+
+    if (typeof eliminarUsuarioDialog.showModal === 'function') {
+        const formulario = document.getElementById('eliminar-usuario-form');
+        const nombre = document.getElementById('eliminar-usuario-nombre');
+        const confirmar = formulario.querySelector('button[type="submit"]');
+
+        for (const enlace of document.querySelectorAll('[data-eliminar-usuario]')) {
+            enlace.setAttribute('aria-haspopup', 'dialog');
+            enlace.addEventListener('click', (event) => {
+                if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+                event.preventDefault();
+                formulario.action = enlace.href;
+                nombre.textContent = enlace.dataset.eliminarUsuario;
+                confirmar.disabled = false;
+                eliminarUsuarioDialog.showModal();
+            });
+        }
+
+        formulario.addEventListener('submit', () => {
+            confirmar.disabled = true;
+        });
+    }
+</script>
+{% endblock %}

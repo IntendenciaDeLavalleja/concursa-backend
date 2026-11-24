@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Concursos{% endblock %}
+{% block content %}
+
+<div class="flex flex-wrap items-center justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl font-extrabold text-white tracking-tight">Concursos</h1>
+        <p class="text-sm text-blue-400/75 mt-1">Configurá documentos públicos, tipo de llamado y enlaces oficiales de cada concurso</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-3">
+        {% if current_user.is_superuser %}
+        <a href="{{ url_for('admin.catalogos_concursos', catalogo='areas') }}" class="btn btn-ghost">
+            Administrar catálogos
+        </a>
+        {% endif %}
+        <a href="{{ url_for('admin.concurso_new') }}" class="btn btn-primary">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            Nuevo llamado
+        </a>
+    </div>
+</div>
+
+<form method="GET" class="vio-card p-5 mb-6 space-y-5">
+    <div class="flex flex-col gap-3 xl:flex-row xl:items-end">
+        <div class="flex-1">
+            <label class="vio-label" for="q">Buscar concurso</label>
+            <input
+                type="text"
+                id="q"
+                name="q"
+                value="{{ filter_data.get('q', '') }}"
+                class="vio-input"
+                placeholder="Título, slug, localidad, área o tipo..."
+            >
+        </div>
+        <div class="w-full xl:w-52">
+            <label class="vio-label" for="estado">Estado</label>
+            <select id="estado" name="estado" class="vio-input">
+                <option value="">Todos</option>
+                <option value="borrador" {% if filter_data.get('estado') == 'borrador' %}selected{% endif %}>Borrador</option>
+                <option value="proximo" {% if filter_data.get('estado') == 'proximo' %}selected{% endif %}>Próximo</option>
+                <option value="abierto" {% if filter_data.get('estado') == 'abierto' %}selected{% endif %}>Abierto</option>
+                <option value="en_proceso" {% if filter_data.get('estado') == 'en_proceso' %}selected{% endif %}>En proceso</option>
+                <option value="finalizado" {% if filter_data.get('estado') == 'finalizado' %}selected{% endif %}>Finalizado</option>
+                <option value="suspendido" {% if filter_data.get('estado') == 'suspendido' %}selected{% endif %}>Suspendido</option>
+                <option value="archivado" {% if filter_data.get('estado') == 'archivado' %}selected{% endif %}>Archivado</option>
+            </select>
+        </div>
+        <div class="flex items-center gap-3 xl:pb-0.5">
+            <button type="submit" class="btn btn-primary">Aplicar filtros</button>
+            <a href="{{ url_for('admin.concursos_admin') }}" class="btn btn-ghost">Limpiar</a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+        <div>
+            <label class="vio-label" for="area_convocante_id">Dirección / área</label>
+            <select id="area_convocante_id" name="area_convocante_id" class="vio-input">
+                <option value="">Todas</option>
+                {% for area in areas %}
+                <option value="{{ area.id }}" {% if filter_data.get('area_convocante_id') == area.id|string %}selected{% endif %}>{{ area.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="vio-label" for="tipo_contratacion_id">Tipo de vínculo</label>
+            <select id="tipo_contratacion_id" name="tipo_contratacion_id" class="vio-input">
+                <option value="">Todos</option>
+                {% for tipo in tipos_contra %}
+                <option value="{{ tipo.id }}" {% if filter_data.get('tipo_contratacion_id') == tipo.id|string %}selected{% endif %}>{{ tipo.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="vio-label" for="tipo_llamado_id">Clasificación de llamado</label>
+            <select id="tipo_llamado_id" name="tipo_llamado_id" class="vio-input">
+                <option value="">Todos</option>
+                {% for tipo in tipos_llamado %}
+                <option value="{{ tipo.id }}" {% if filter_data.get('tipo_llamado_id') == tipo.id|string %}selected{% endif %}>{{ tipo.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="vio-label" for="fecha_campo">Filtrar por fecha</label>
+            <select id="fecha_campo" name="fecha_campo" class="vio-input">
+                <option value="apertura" {% if filter_data.get('fecha_campo') != 'cierre' %}selected{% endif %}>Fecha de apertura</option>
+                <option value="cierre" {% if filter_data.get('fecha_campo') == 'cierre' %}selected{% endif %}>Fecha de cierre</option>
+            </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 xl:col-span-1">
+            <div>
+                <label class="vio-label" for="fecha_desde">Desde</label>
+                <input type="date" id="fecha_desde" name="fecha_desde" value="{{ filter_data.get('fecha_desde', '') }}" class="vio-input">
+            </div>
+            <div>
+                <label class="vio-label" for="fecha_hasta">Hasta</label>
+                <input type="date" id="fecha_hasta" name="fecha_hasta" value="{{ filter_data.get('fecha_hasta', '') }}" class="vio-input">
+            </div>
+        </div>
+    </div>
+
+    <div class="flex items-center justify-between gap-3 border-t border-blue-500/15 pt-4 text-sm">
+        <p class="text-blue-300/80">
+            {{ total_resultados }} resultado{% if total_resultados != 1 %}s{% endif %}
+        </p>
+        <p class="text-blue-400/60">Buscá por concurso, filtrá por dirección, vínculo, tipo y rango de fechas.</p>
+    </div>
+</form>
+
+{% if concursos %}
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+    {% for concurso in concursos %}
+    {% set estado_actual = concurso.estado_publico %}
+    {% set docs = concurso.public_documents(estado=estado_actual) %}
+    {% set rich_docs = concurso.document_contents() %}
+    <div class="vio-card p-5 flex flex-col gap-4">
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                <h2 class="text-lg font-bold text-white leading-tight">{{ concurso.titulo }}</h2>
+                <p class="text-xs text-blue-400/60 mt-1">/{{ concurso.slug }}</p>
+            </div>
+            <span class="badge {{ 'badge-green' if estado_actual == 'abierto' else 'badge-gray' }}">{{ 'Próximo' if estado_actual == 'proximo' else estado_actual|replace('_', ' ')|capitalize }}</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <div class="rounded-xl border border-blue-500/20 bg-blue-950/40 p-3">
+                <p class="text-xs uppercase tracking-wider text-blue-400/60 mb-1">Clasificación de llamado</p>
+                <p class="text-white font-semibold">{{ concurso.tipo_llamado_rel.nombre if concurso.tipo_llamado_rel else 'Sin definir' }}</p>
+            </div>
+            <div class="rounded-xl border border-blue-500/20 bg-blue-950/40 p-3">
+                <p class="text-xs uppercase tracking-wider text-blue-400/60 mb-1">Documentos ricos</p>
+                <p class="text-white font-semibold">{{ rich_docs|length }}</p>
+            </div>
+            <div class="rounded-xl border border-blue-500/20 bg-blue-950/40 p-3">
+                <p class="text-xs uppercase tracking-wider text-blue-400/60 mb-1">Postulación web</p>
+                <p class="text-white font-semibold">{{ 'Disponible' if estado_actual == 'abierto' and concurso.postulacion_web_habilitada() else 'No disponible' }}</p>
+            </div>
+            <div class="rounded-xl border border-blue-500/20 bg-blue-950/40 p-3">
+                <p class="text-xs uppercase tracking-wider text-blue-400/60 mb-1">Tipo de vínculo</p>
+                <p class="text-white font-semibold">{{ concurso.tipo_contratacion_rel.nombre if concurso.tipo_contratacion_rel else 'Sin definir' }}</p>
+            </div>
+        </div>
+
+        {% if docs %}
+        <div class="space-y-2">
+            {% for doc in docs %}
+            <div class="flex items-center justify-between rounded-xl border border-blue-500/20 bg-blue-950/20 px-3 py-2">
+                <div>
+                    <p class="text-sm font-medium text-white">{{ doc.nombre }}</p>
+                    <p class="text-xs text-blue-400/60">{{ doc.kind }}</p>
+                </div>
+                <span class="badge badge-blue">{{ doc.tipo }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="rounded-xl border border-dashed border-blue-500/20 bg-blue-950/20 px-4 py-5 text-center text-sm text-blue-400/60">
+            Este concurso aún no tiene documentos públicos configurados.
+        </div>
+        {% endif %}
+
+        <div class="pt-2 border-t border-blue-500/20 flex flex-wrap justify-end gap-2">
+            <a href="{{ url_for('admin.concurso_edit', concurso_id=concurso.id) }}" class="btn btn-primary">
+                Editar configuración
+            </a>
+            <a href="{{ url_for('admin.concurso_actualizaciones', concurso_id=concurso.id) }}" class="btn btn-ghost">Comunicados por etapa</a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="vio-card p-16 text-center">
+    <h3 class="text-lg font-bold text-white mb-2">No hay concursos registrados</h3>
+    <p class="text-sm text-blue-400/70">Cuando existan llamados, podrás administrar aquí sus documentos públicos.</p>
+</div>
+{% endif %}
+
+{% endblock %}

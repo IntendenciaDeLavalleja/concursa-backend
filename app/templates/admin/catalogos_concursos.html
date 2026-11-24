@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}Catálogos de concursos{% endblock %}
+{% block content %}
+
+<header class="mb-6 flex flex-wrap items-center justify-between gap-4">
+    <h1 class="text-2xl font-extrabold text-white tracking-tight">Catálogos de concursos</h1>
+    <a href="{{ url_for('admin.concursos_admin') }}" class="btn btn-ghost">Ver concursos</a>
+</header>
+
+<nav aria-label="Catálogos de concursos" class="mb-6 flex flex-wrap gap-2">
+    {% for clave, opcion_catalogo in catalogos.items() %}
+    <a href="{{ url_for('admin.catalogos_concursos', catalogo=clave) }}"
+        class="btn {{ 'btn-primary' if clave == clave_catalogo else 'btn-ghost' }}"
+        {% if clave == clave_catalogo %}aria-current="page"{% endif %}>{{ opcion_catalogo.titulo }}</a>
+    {% endfor %}
+</nav>
+
+<div class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
+    <section class="vio-card p-6 space-y-4" aria-labelledby="opciones-titulo">
+        <h2 id="opciones-titulo" class="text-xl font-bold text-white">{{ catalogo.titulo }}</h2>
+
+        {% if opciones %}
+        <div class="overflow-x-auto">
+            <table class="vio-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Nombre</th>
+                        {% if clave_catalogo == 'tipos-llamado' %}<th scope="col">Slug</th>{% endif %}
+                        <th scope="col">Estado</th>
+                        <th scope="col">Llamados</th>
+                        <th scope="col" class="text-right">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for opcion, uso in opciones %}
+                    <tr>
+                        <td>
+                            <div class="font-semibold text-white wrap-anywhere">{{ opcion.nombre }}</div>
+                            {% if opcion.descripcion %}<div class="text-xs text-blue-300 mt-1 wrap-anywhere">{{ opcion.descripcion }}</div>{% endif %}
+                        </td>
+                        {% if clave_catalogo == 'tipos-llamado' %}<td class="text-xs text-blue-300 wrap-anywhere">{{ opcion.slug }}</td>{% endif %}
+                        <td>
+                            <span class="badge {{ 'badge-green' if opcion.is_active else 'badge-gray' }}">
+                                {{ 'Activo' if opcion.is_active else 'Inactivo' }}
+                            </span>
+                        </td>
+                        <td>{{ uso }}</td>
+                        <td>
+                            <div class="flex flex-wrap justify-end gap-2">
+                                <a href="{{ url_for('admin.catalogos_concursos', catalogo=clave_catalogo, edit=opcion.id) }}" class="btn btn-ghost btn-sm">Editar</a>
+                                <form method="POST" action="{{ url_for('admin.catalogo_concurso_toggle', catalogo=clave_catalogo, opcion_id=opcion.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm {{ 'btn-outline-danger' if opcion.is_active else 'btn-success' }}">
+                                        {{ 'Desactivar' if opcion.is_active else 'Activar' }}
+                                    </button>
+                                </form>
+                                <button type="button" class="btn btn-outline-danger btn-sm"
+                                    data-eliminar-url="{{ url_for('admin.catalogo_concurso_eliminar', catalogo=clave_catalogo, opcion_id=opcion.id) }}"
+                                    data-opcion-id="{{ opcion.id }}" data-nombre-opcion="{{ opcion.nombre }}" data-llamados="{{ uso }}"
+                                    aria-haspopup="dialog" aria-label="Eliminar {{ opcion.nombre }}">Eliminar</button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="rounded-xl border border-dashed border-blue-500/20 bg-blue-950/20 p-6 text-sm text-blue-300">Todavía no hay opciones en este catálogo.</p>
+        {% endif %}
+    </section>
+
+    <section class="vio-card p-6 h-fit space-y-4" aria-labelledby="formulario-catalogo-titulo">
+        <h2 id="formulario-catalogo-titulo" class="text-xl font-bold text-white">{{ 'Editar opción' if editando and editando.id else catalogo.nuevo }}</h2>
+        <form method="POST" action="{{ url_for('admin.catalogos_concursos', catalogo=clave_catalogo) }}"
+            aria-labelledby="formulario-catalogo-titulo" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% if editando and editando.id %}
+            <input type="hidden" name="{{ catalogo.campo }}" value="{{ editando.id }}">
+            {% endif %}
+            {% if error %}<p id="catalogo-error" role="alert" class="text-sm text-red-300">{{ error }}</p>{% endif %}
+            <div>
+                <label class="vio-label" for="nombre">Nombre</label>
+                <input id="nombre" name="nombre" type="text" class="vio-input" value="{{ nombre }}" maxlength="{{ catalogo.limite_nombre }}"
+                    required {% if error %}autofocus aria-describedby="catalogo-error"{% endif %}>
+            </div>
+            <div>
+                <label class="vio-label" for="descripcion">Descripción (opcional)</label>
+                <textarea id="descripcion" name="descripcion" rows="4" class="vio-input">{{ descripcion }}</textarea>
+            </div>
+            <div class="flex flex-wrap gap-3">
+                <button type="submit" class="btn btn-primary flex-1 justify-center">{{ 'Guardar cambios' if editando and editando.id else 'Crear opción' }}</button>
+                {% if editando and editando.id %}
+                <a href="{{ url_for('admin.catalogos_concursos', catalogo=clave_catalogo) }}" class="btn btn-ghost">Cancelar</a>
+                {% endif %}
+            </div>
+        </form>
+    </section>
+</div>
+
+<dialog id="eliminar-opcion-dialog" class="vio-card fixed inset-0 m-auto overflow-y-auto p-6 text-slate-200"
+    aria-labelledby="eliminar-opcion-titulo" aria-describedby="eliminar-opcion-aviso eliminar-opcion-asociados">
+    <h1 id="eliminar-opcion-titulo" class="text-xl font-bold text-white">¿Eliminar esta opción?</h1>
+    <p id="eliminar-opcion-aviso" class="mt-3 text-sm">
+        Vas a eliminar «<strong id="eliminar-opcion-nombre"></strong>» del catálogo. Esta acción es permanente.
+    </p>
+    <form id="eliminar-opcion-form" method="POST" aria-labelledby="eliminar-opcion-titulo" class="mt-5 space-y-5">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="confirmar" value="1">
+        <div id="eliminar-opcion-reasignacion" class="space-y-3" hidden>
+            <p id="eliminar-opcion-asociados" class="text-sm"></p>
+            <div>
+                <label class="vio-label" for="eliminar-opcion-reemplazo">Nueva opción para los llamados</label>
+                <select id="eliminar-opcion-reemplazo" name="reemplazo" class="vio-input" disabled>
+                    <option value="">Elegí qué asignarles</option>
+                    {% if clave_catalogo == 'tipos-llamado' %}
+                    <option value="sin-clasificacion">Dejar sin clasificación</option>
+                    {% endif %}
+                    {% for candidata, _ in opciones if candidata.is_active %}
+                    <option value="{{ candidata.id }}">{{ candidata.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <p id="eliminar-opcion-sin-reemplazo" class="text-sm text-blue-300" hidden>
+                Creá o activá otra opción de este catálogo para continuar.
+            </p>
+        </div>
+        <div class="flex flex-wrap justify-end gap-3">
+            <button type="submit" form="cancelar-eliminar-opcion" class="btn btn-ghost" autofocus>Cancelar</button>
+            <button type="submit" class="btn btn-danger">Eliminar opción</button>
+        </div>
+    </form>
+    <form id="cancelar-eliminar-opcion" method="dialog"></form>
+</dialog>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const eliminarOpcionDialog = document.getElementById('eliminar-opcion-dialog');
+    const eliminarOpcionForm = document.getElementById('eliminar-opcion-form');
+    const eliminarOpcionNombre = document.getElementById('eliminar-opcion-nombre');
+    const confirmarEliminacion = eliminarOpcionForm.querySelector('button.btn-danger');
+    const reasignacion = document.getElementById('eliminar-opcion-reasignacion');
+    const asociados = document.getElementById('eliminar-opcion-asociados');
+    const reemplazo = document.getElementById('eliminar-opcion-reemplazo');
+    const sinReemplazo = document.getElementById('eliminar-opcion-sin-reemplazo');
+    const destinos = Array.from(reemplazo.options).filter((opcion) => opcion.value !== '');
+
+    for (const boton of document.querySelectorAll('[data-eliminar-url]')) {
+        boton.addEventListener('click', () => {
+            eliminarOpcionForm.action = boton.dataset.eliminarUrl;
+            eliminarOpcionNombre.textContent = boton.dataset.nombreOpcion;
+
+            const llamados = Number(boton.dataset.llamados);
+            const enUso = llamados > 0;
+            reasignacion.hidden = !enUso;
+            asociados.textContent = enUso
+                ? `Hay ${llamados} ${llamados === 1 ? 'llamado asociado' : 'llamados asociados'}. Se conservarán junto con sus postulaciones.`
+                : '';
+
+            for (const destino of destinos) {
+                destino.disabled = destino.hidden = destino.value === boton.dataset.opcionId;
+            }
+            const hayReemplazo = destinos.some((opcion) => !opcion.disabled);
+            reemplazo.value = '';
+            reemplazo.required = enUso;
+            reemplazo.disabled = !enUso || !hayReemplazo;
+            sinReemplazo.hidden = hayReemplazo;
+            confirmarEliminacion.disabled = enUso && !hayReemplazo;
+            eliminarOpcionDialog.showModal();
+        });
+    }
+
+    eliminarOpcionForm.addEventListener('submit', () => {
+        confirmarEliminacion.disabled = true;
+    });
+</script>
+{% endblock %}

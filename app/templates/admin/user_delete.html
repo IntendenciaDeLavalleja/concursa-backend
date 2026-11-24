@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Eliminar usuario{% endblock %}
+{% block content %}
+
+<section class="vio-card mx-auto max-w-md p-6">
+    <h1 id="eliminar-usuario-titulo" class="text-xl font-bold text-white">¿Eliminar usuario?</h1>
+    <p class="mt-3 break-words text-sm text-slate-200">
+        Vas a eliminar la cuenta de «<strong>{{ usuario.username }}</strong>».
+        Perderá el acceso al panel. Esta acción es permanente.
+    </p>
+    <div class="mt-6 flex flex-wrap justify-end gap-3">
+        <a href="{{ url_for('admin.users') }}" class="btn btn-ghost">Cancelar</a>
+        <form method="POST" action="{{ url_for('admin.user_delete', usuario_id=usuario.id) }}"
+              aria-labelledby="eliminar-usuario-titulo">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="confirmar" value="1">
+            <button type="submit" class="btn btn-danger">Eliminar usuario</button>
+        </form>
+    </div>
+</section>
+
+{% endblock %}

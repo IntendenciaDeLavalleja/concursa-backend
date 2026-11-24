@@ -1,0 +1,37 @@
+@import "tailwindcss" source(none);
+@source "../templates/base.html";
+@source "../templates/admin";
+
+@theme {
+  --font-sans: "Inter", sans-serif;
+  --font-heading: "Plus Jakarta Sans", sans-serif;
+}
+
+#cuentas-usuarios .vio-table :is(th, td) {
+  padding-inline: 0.75rem;
+}
+
+#cuentas-usuarios .vio-table th:last-child {
+  text-align: right;
+}
+
+:is(#alta-catalogo-dialog, #eliminar-opcion-dialog, #eliminar-usuario-dialog) {
+  width: min(calc(100% - 2rem), 28rem);
+  max-height: calc(100dvh - 2rem);
+}
+
+:is(#alta-catalogo-dialog, #eliminar-opcion-dialog, #eliminar-usuario-dialog):modal {
+  overscroll-behavior: contain;
+}
+
+:is(#alta-catalogo-dialog, #eliminar-opcion-dialog, #eliminar-usuario-dialog)::backdrop {
+  background-color: rgb(0 0 0 / 75%);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+:is([data-alta-catalogo], [data-eliminar-url]):focus-visible,
+:is(#alta-catalogo-dialog, #eliminar-opcion-dialog, #eliminar-usuario-dialog, #formulario-usuario, #cuentas-usuarios) .btn:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 3px;
+}
