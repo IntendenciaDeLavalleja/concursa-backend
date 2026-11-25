@@ -13,6 +13,7 @@ from sqlalchemy import and_, case
 from sqlalchemy.ext.hybrid import hybrid_property
 
 from app.extensions import db
+from app.services.concurso_documents import pdf_concurso_disponible
 
 
 CONCURSO_TIMEZONE = ZoneInfo('America/Montevideo')
@@ -300,13 +301,15 @@ class Concurso(db.Model):
 
         return sources.get(document_id)
 
-    def public_documents(self, *, estado=None):
+    def public_documents(self, *, estado=None, verificar_pdf=False):
         contents = self.document_contents()
         documents = []
 
         for definition in self.DOCUMENT_DEFINITIONS:
             document_id = definition['id']
             source = self.document_download_source(document_id)
+            if verificar_pdf and source and not pdf_concurso_disponible(source):
+                source = None
             has_page = document_id in contents
             if not source and not has_page:
                 continue
@@ -349,7 +352,7 @@ class Concurso(db.Model):
             pass
 
         programacion = self._estado_para_api()
-        documents = self.public_documents(estado=programacion['estado'])
+        documents = self.public_documents(estado=programacion['estado'], verificar_pdf=True)
         return {
             'id': self.id,
             'titulo': self.titulo,

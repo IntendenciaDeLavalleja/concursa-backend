@@ -5,6 +5,7 @@ from io import BytesIO, StringIO
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from minio.error import S3Error
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
@@ -42,6 +43,10 @@ class MemoryStorage:
         obj = StoredObject(body)
         obj.headers = {'Content-Length': str(len(body))}
         return obj
+
+    def stat_object(self, bucket, key):
+        if (bucket, key) not in self.objects:
+            raise S3Error(None, 'NoSuchKey', 'Object does not exist', None, None, None)
 
     def remove_object(self, bucket, key):
         self.objects.pop((bucket, key), None)
@@ -505,6 +510,61 @@ def test_recuperar_correo_y_confirmar_sin_duplicados(portal, monkeypatch):
     assert public.post(verification, data=nuevo_enlace).json['tracking_code'] == code
     assert public.post(verification, data={**nuevo_enlace, 'token': 'incorrecto'}).status_code == 400
     assert public.get(f'{creation}/seguimiento/{code}').json['estado_raw'] == 'recibida'
+
+
+@pytest.mark.parametrize(('campo_pdf', 'documento_id'), [
+    ('bases_concurso_pdf', 'bases-concurso'),
+    ('bases_llamado_pdf', 'bases-llamado'),
+    ('anexo_pdf', 'anexo-declaracion-jurada'),
+])
+def test_detalle_verifica_el_pdf_de_cada_documento(portal, campo_pdf, documento_id):
+    _, _, public, _, storage, _, _ = portal
+    _, slug = crear_llamado(
+        portal,
+        bases_concurso_html='<p>Bases del concurso</p>',
+        bases_llamado_html='<p>Bases del llamado</p>',
+        anexo_declaracion_jurada_html='<p>Resolución</p>',
+        **{campo_pdf: (BytesIO(PDF), 'oficial.pdf')},
+    )
+    url = f'/api/concursos/{slug}'
+    pdf_url = f'{url}/documentos/{documento_id}/pdf'
+    documents = public.get(url).json['documentos']
+    assert {doc['id'] for doc in documents if doc['kind'] == 'page'} == {
+        'bases-concurso', 'bases-llamado', 'anexo-declaracion-jurada',
+    }
+    assert {doc['id']: doc['download_url'] for doc in documents if doc['download_url']} == {
+        documento_id: pdf_url,
+    }
+    assert public.get(pdf_url).data == PDF
+
+    bucket, key = next(iter(storage.objects))
+    storage.remove_object(bucket, key)
+    documents = public.get(url).json['documentos']
+    assert all(doc['download_url'] is None for doc in documents)
+    assert documents[-1]['kind'] == 'postulacion'
+
+
+def test_detalle_verifica_pdf_estatico(portal, tmp_path):
+    app, _, public, _, _, _, _ = portal
+    concurso_id, slug = crear_llamado(portal, postulacion_web_habilitada='')
+    app.static_folder = tmp_path
+    pdf = tmp_path / 'bases.pdf'
+    pdf.write_bytes(PDF)
+    source = '/public/bases.pdf'
+    with app.app_context():
+        db.session.get(Concurso, concurso_id).bases_url = source
+        db.session.commit()
+
+    url = f'/api/concursos/{slug}'
+    documents = public.get(url).json['documentos']
+    assert len(documents) == 1
+    assert documents[0]['download_url'] == source
+    assert public.get(source).data == PDF
+
+    pdf.unlink()
+    detail = public.get(url).json
+    assert detail['documentos'] == []
+    assert detail['bases_url'] is None
 
 
 def test_borrador_publicacion_y_adjuntos_por_etapa(portal):

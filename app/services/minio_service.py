@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 import certifi
 from flask import Response, abort, current_app
 from minio import Minio
-from minio.error import S3Error
+from minio.error import MinioException, S3Error
 from urllib3 import PoolManager, Retry, Timeout
 from urllib3.exceptions import HTTPError
 
@@ -143,6 +143,20 @@ class MinioService:
             raise RuntimeError('MinIO client not initialized')
 
         return self.client.get_object(current_app.config['MINIO_BUCKET_NAME'], object_name)
+
+    def object_exists(self, key):
+        if not self.client:
+            return False
+
+        try:
+            self.client.stat_object(current_app.config['MINIO_BUCKET_NAME'], key)
+            return True
+        except S3Error as error:
+            if error.code != 'NoSuchKey':
+                current_app.logger.exception('No se pudo verificar un archivo de MinIO')
+        except (MinioException, HTTPError, OSError):
+            current_app.logger.exception('No se pudo verificar un archivo de MinIO')
+        return False
 
     def download_response(self, key, filename, mimetype='application/octet-stream'):
         try:
